@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="TreskelRest.API/TreskelRest.API.csproj" />
+  <Project Path="TreskelRest.Biz.Test/TreskelRest.Biz.Test.csproj" Id="77604ce1-34dc-404e-b7fe-bbf04549ed2d" />
+  <Project Path="TreskelRest.Biz/TreskelRest.Biz.csproj" />
+  <Project Path="TreskelRest.Data.Test/TreskelRest.Data.Test.csproj" />
+  <Project Path="TreskelRest.Data/TreskelRest.Data.csproj" />
+</Solution>

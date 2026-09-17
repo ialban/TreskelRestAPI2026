@@ -1,0 +1,60 @@
+## Visual Studio - Carpetas de Compilación y Salida
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Re]leases/
+x64/
+x86/
+[Aa]rm/
+[Aa]rm64/
+bsearch/
+glog/
+bin/
+obj/
+TestResults/
+
+## Herramientas de Instaladores (Ej. Carpetas de Setup y MSIs)
+*.msi
+*.msix
+*.msm
+*.msp
+[Tt]reskelSetup/TreskelSetup-SetupFiles/
+
+## Archivos de Configuración de Usuario de Visual Studio (.vs)
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## Archivos generados por Herramientas y Paquetes de C# (.NET)
+.NETFrameworkSource/
+dist/
+target/
+_ReSharper.*/
+*.resharper
+*.DotSettings.user
+
+## Paquetes de NuGet (Evita subir librerías descargadas)
+*.nuget.props
+*.nuget.targets
+packages/
+# Excluir la configuración interna de nuget si usas paquetes locales
+!packages/repositories.config
+
+## Archivos de Migraciones de Base de Datos / LocalDB
+*.mdf
+*.ldf
+*.sdf
+
+## Archivos del Sistema Operativo
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+# macOS
+.DS_Store
+
+## Archivos Logs y Crash Dumps
+*.log
+*.crash

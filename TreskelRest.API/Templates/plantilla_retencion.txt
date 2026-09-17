@@ -1,0 +1,28 @@
+﻿============================================================
+{{NOMBRE_EMPRESA}} 
+------------------------------------------------------------
+RETENCIÓN ELECTRÓNICA
+============================================================
+
+Estimado/a {{NOMBRE_CLIENTE}},
+
+Le informamos que ya se encuentra disponible su comprobante electrónico correspondiente a su última transacción comercial. Adjunto a este correo encontrará los archivos en formato PDF y XML.
+
+RESUMEN DEL COMPROBANTE:
+------------------------------------------------------------
+Número de Factura:  {{NUMERO_FACTURA}}
+Fecha de Emisión:   {{FECHA_EMISION}}
+Monto Total:        {{VALOR_TOTAL}}
+------------------------------------------------------------
+
+Si tiene alguna duda o consulta sobre este cargo, por favor no responda directamente a este correo automático; póngase en contacto con nuestro equipo de soporte técnico.
+
+Atentamente,
+El equipo de {{NOMBRE_EMPRESA}}
+
+============================================================
+Este es un correo automatizado, por favor no lo responda.
+{{DIRECCION_EMPRESA}} | {{RUC_EMPRESA}}
+
+¿Desea cambiar el correo de recepción o gestionar sus notificaciones? Solicite el cambio respondiendo a este mensaje o escribiendo directamente a: soporte@lacostatech.com (Asunto: Modificar preferencias de facturacion).
+============================================================
