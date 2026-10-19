@@ -1,22 +1,18 @@
-﻿using AutoMapper;
-using MediatR;
+﻿using TreskelRest.Biz.Mappers;
+using TreskelRest.Biz.Models.Common;
 using TreskelRest.Biz.Models.Requests;
 using TreskelRest.Biz.Models.Responses;
 using TreskelRest.Data;
 
 namespace TreskelRest.Biz.Servicios
 {
-    public record GetLoginQuery(AuthenticationRequests payload) : IRequest<AuthenticationResponse>;
+    public record GetLoginQuery(AuthenticationRequests payload);
 
-    public class GetLoginHandler : IRequestHandler<GetLoginQuery, AuthenticationResponse>
+    public class GetLoginHandler : ServiciosHandler 
     {
-        private readonly ITreskelRepository _repo;
-        private IMapper _mapper;
-
-        public GetLoginHandler(ITreskelRepository repo, IMapper mapper)
+        public GetLoginHandler(ITreskelRepository repo, BizMapperProfile mapper): base(repo, mapper)
         {
-            _repo = repo;
-            _mapper = mapper;
+            
         }
 
         public async Task<AuthenticationResponse> Handle(GetLoginQuery request, CancellationToken cancellationToken)
@@ -26,7 +22,7 @@ namespace TreskelRest.Biz.Servicios
                 throw new ArgumentNullException(nameof(request.payload));
             }
 
-            Data.Base.UsuarioRequest usuario = _mapper.Map<Data.Base.UsuarioRequest>(request.payload);
+            Data.Base.UsuarioRequest usuario = _mapper.AuthenticationRequestToUsuarioRequest(request.payload);
 
             var empresa = await _repo.login(usuario);
 
@@ -35,8 +31,8 @@ namespace TreskelRest.Biz.Servicios
                 throw new UnauthorizedAccessException("Acceso no autorizado, Usuario o contraseña incorrectos");
             }
 
-            if (empresa.Clave == request.payload.Clave) { 
-                var response = _mapper.Map<AuthenticationResponse>(empresa);
+            if (empresa.Clave == request.payload.Clave) {
+                var response = _mapper.UsuarioToAuthenticationResponse(empresa);
 
                 return response;
             }

@@ -1,30 +1,21 @@
-﻿using AutoMapper;
-using MediatR;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using TreskelRest.Biz.Interfaces;
+﻿using TreskelRest.Biz.Mappers;
+using TreskelRest.Biz.Models.Common;
 using TreskelRest.Biz.Models.Requests;
 using TreskelRest.Biz.Models.Responses;
 using TreskelRest.Data;
 using TreskelRest.Data.Models;
-using static System.Net.WebRequestMethods;
 
 namespace TreskelRest.Biz.Servicios
 {
-    public record ProcesarUsuariosCommand(UsuarioRequest usuario) : IRequest<UsuarioResponse>;
+    public record ProcesarUsuariosCommand(UsuarioRequest usuario);
 
-    public class ProcesarUsuariosHandler : ProcessHandler, IRequestHandler<ProcesarUsuariosCommand, UsuarioResponse>
+    public class ProcesarUsuariosHandler : ServiciosHandler
     {
-        private readonly ITreskelRepository _repo;
-        private readonly IMapper _mapper;
-
         public ProcesarUsuariosHandler(
             ITreskelRepository repo,
-            IMapper mapper)
+            BizMapperProfile mapper): base(repo, mapper)
         {
-            _repo = repo;
-            _mapper = mapper;
+
         }
 
         public async Task<UsuarioResponse> Handle(ProcesarUsuariosCommand request, CancellationToken cancellationToken)
@@ -34,7 +25,8 @@ namespace TreskelRest.Biz.Servicios
                 throw new ArgumentNullException(nameof(request.usuario));
             }
 
-            UsuarioEmpresa _usuario = _mapper.Map<UsuarioEmpresa>(request.usuario);
+            UsuarioEmpresa _usuario = _mapper.UsuarioRequestToUsuario(request.usuario);
+                
             var resultado = await _repo.actualizaCliente(_usuario);
 
             UsuarioResponse comprobante = new UsuarioResponse

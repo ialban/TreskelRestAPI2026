@@ -1,35 +1,28 @@
-﻿using AutoMapper;
-using MediatR;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using TreskelRest.Biz.Mappers;
 using TreskelRest.Biz.Models;
+using TreskelRest.Biz.Models.Common;
 using TreskelRest.Biz.Models.Responses;
 using TreskelRest.Data;
 using TreskelRest.Data.Models;
 
 namespace TreskelRest.Biz.Servicios
 {
-    public record DownloadDocummentCommand(Factura factura, string tipo) : IRequest<ArchivoResponse>;
-    public class DownloadDocumentsHandler : IRequestHandler<DownloadDocummentCommand, ArchivoResponse>
+    public record DownloadDocummentCommand(Factura factura, string tipo);
+    public class DownloadDocumentsHandler : ServiciosHandler
     {
         private readonly ITreskelFilesRepository _files;
-        private readonly ITreskelRepository _repo;
-        private readonly IMapper _mapper;
 
         public DownloadDocumentsHandler(
             ITreskelFilesRepository mongoRepo,
             ITreskelRepository repo,
-            IMapper mapper)
+            BizMapperProfile mapper): base(repo, mapper)
         {
             _files = mongoRepo;
-            _repo = repo;
-            _mapper = mapper;
         }
 
         public async Task<ArchivoResponse> Handle(DownloadDocummentCommand request, CancellationToken cancellationToken)
         {
-            Facturacion _factura = _mapper.Map<Facturacion>(request.factura);
+            Facturacion _factura = _mapper.FacturaToDto(request.factura);
 
             // 1.- Obtener el path del archivo a descargar o el archivoid de mongo
             var fileInfo = await _repo.obtenerFactura(_factura, request.tipo.Substring(0,1).ToUpper());

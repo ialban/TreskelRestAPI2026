@@ -1,17 +1,18 @@
-﻿using AutoMapper;
-using MediatR;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using TreskelRest.API.Common;
+using TreskelRest.API.Mappers;
 using TreskelRest.API.Models.Usuarios;
+using TreskelRest.Biz.Models.Responses;
 using TreskelRest.Biz.Servicios;
 using TreskelRest.Data.Models;
+using Wolverine;
 
 namespace TreskelRest.API.Controllers
 {
     [Route("[controller]")]
     public class UsuarioController: TreskelController
     {
-        public UsuarioController(IConfiguration config, IMediator mediator, IMapper mapper) : base(config, mediator, mapper)
+        public UsuarioController(IConfiguration config, IMessageBus mediator, APIMapperProfile mapper) : base(config, mediator, mapper)
         {
 
         }
@@ -21,10 +22,12 @@ namespace TreskelRest.API.Controllers
         {
             Biz.Models.Requests.AuthenticationRequests request = new Biz.Models.Requests.AuthenticationRequests();
 
-            request = _mapper.Map<Biz.Models.Requests.AuthenticationRequests>(payload);
-            var res = await _mediator.Send(new GetLoginQuery(request));
+            request = _mapper.ToBizAuthenticationRequest(payload);
+                
+            var res = await _mediator.InvokeAsync<Biz.Models.Responses.AuthenticationResponse>(new GetLoginQuery(request));
 
-            var response = _mapper.Map<API.Models.Usuarios.AuthenticationResponse>(res);
+            var response = _mapper.ToAPIAuthenticationResponse(res);
+                
             response.EmpresaId = payload.EmpresaId;
             response.Token = Utils.generaToken(response, TokenKey);
 
@@ -37,8 +40,9 @@ namespace TreskelRest.API.Controllers
             var valido = ValidateToken(token);
             if (valido != null)
             {
-                var usuarioEmpresa = _mapper.Map<Biz.Models.Requests.UsuarioRequest>(payload);
-                var resultado = await _mediator.Send(new ProcesarUsuariosCommand(usuarioEmpresa));
+                var usuarioEmpresa = _mapper.UsuarioEmpresaToUsuarioRequest(payload);
+                    
+                var resultado = await _mediator.InvokeAsync<UsuarioResponse>(new ProcesarUsuariosCommand(usuarioEmpresa));
 
                 return Ok(resultado);
             }

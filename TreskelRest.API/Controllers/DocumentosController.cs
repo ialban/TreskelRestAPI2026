@@ -1,16 +1,16 @@
-﻿using AutoMapper;
-using MediatR;
-using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using TreskelRest.API.Common;
+using TreskelRest.API.Mappers;
+using TreskelRest.Biz.Models.Responses;
 using TreskelRest.Biz.Servicios;
+using Wolverine;
 
 namespace TreskelRest.API.Controllers
 {
     [Route("[controller]")]
     public class DocumentosController : TreskelController
     {
-        public DocumentosController(IConfiguration config, IMediator mediator, IMapper mapper) : base(config, mediator, mapper)
+        public DocumentosController(IConfiguration config, IMessageBus mediator, APIMapperProfile mapper) : base(config, mediator, mapper)
         {
 
         }
@@ -29,8 +29,9 @@ namespace TreskelRest.API.Controllers
                 string filename = string.Empty;
 
                 // Obtenemos el archivo a descargar según el tipo de documento
-                var factura = _mapper.Map<Biz.Models.Factura>(payload);
-                var response = await _mediator.Send(new DownloadDocummentCommand(factura, tipo));
+                var factura = _mapper.ToBizFactura(payload);
+
+                var response = await _mediator.InvokeAsync<ArchivoResponse>(new DownloadDocummentCommand(factura, tipo));
 
                 respuesta.EsError = false;
 

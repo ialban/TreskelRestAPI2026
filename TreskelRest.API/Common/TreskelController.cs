@@ -1,6 +1,7 @@
-﻿using AutoMapper;
-using MediatR;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
+using TreskelRest.API.Mappers;
+using Wolverine;
+using Wolverine.Runtime;
 
 namespace TreskelRest.API.Common
 {
@@ -9,16 +10,16 @@ namespace TreskelRest.API.Common
     public class TreskelController : ControllerBase
     {
         protected string TokenKey;
-        protected IMediator _mediator;
+        protected IMessageBus _mediator;
         private readonly IConfiguration _configuration;
-        protected IMapper _mapper;
+        protected APIMapperProfile _mapper;
 
-        public TreskelController(IConfiguration configuration, IMediator mediator, IMapper mapper)
+        public TreskelController(IConfiguration configuration, IMessageBus mediator, APIMapperProfile mapper)
         {
             _configuration = configuration;
             _mediator = mediator;
             _mapper = mapper;
-            //TokenKey = _configuration.GetValue<string>("TokenKey");
+            
             TokenKey = _configuration.GetSection("jwt:Key").Value;
         }
 

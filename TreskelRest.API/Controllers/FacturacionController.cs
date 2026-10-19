@@ -1,16 +1,17 @@
-﻿using AutoMapper;
-using MediatR;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using TreskelRest.API.Common;
 using TreskelRest.API.Helpers;
+using TreskelRest.API.Mappers;
+using TreskelRest.Biz.Models.Responses;
 using TreskelRest.Biz.Servicios;
+using Wolverine;
 
 namespace TreskelRest.API.Controllers
 {
     [Route("[controller]")]
     public class FacturacionController: TreskelController
     {
-        public FacturacionController(IConfiguration config, IMediator mediator, IMapper mapper) :base(config, mediator, mapper)
+        public FacturacionController(IConfiguration config, IMessageBus mediator, APIMapperProfile mapper) :base(config, mediator, mapper)
         {
 
         }
@@ -25,11 +26,11 @@ namespace TreskelRest.API.Controllers
                 Sri.Factura _factura = XMLHelper.Deserialize<Sri.Factura>(payload.data);
 
                 Biz.Models.Factura factura = new Biz.Models.Factura();
-                Biz.Models.Documentos.Factura _documento = _mapper.Map<Biz.Models.Documentos.Factura>(_factura);
+                Biz.Models.Documentos.Factura _documento = _mapper.FacturaSriToFactura(_factura);
 
-                factura = _mapper.Map<Biz.Models.Factura>(payload);
+                factura = _mapper.ToBizFactura(payload);
 
-                var res = await _mediator.Send(new ProcesarComprobanteCommand(factura, _documento, payload.empresaid, payload.bData));
+                var res = await _mediator.InvokeAsync<ComprobanteResponse>(new ProcesarComprobanteCommand(factura, _documento, payload.empresaid, payload.bData));
                 return Ok(res);
             }
             return Unauthorized();
@@ -42,9 +43,9 @@ namespace TreskelRest.API.Controllers
             if (valido != null)
             {
                 Biz.Models.Factura factura = new Biz.Models.Factura();
-                factura = _mapper.Map<Biz.Models.Factura>(payload);
+                factura = _mapper.ToBizFactura(payload);
 
-                var res = await _mediator.Send(new VerificarFacturasCommand(factura, payload.empresaid));
+                var res = await _mediator.InvokeAsync<ComprobanteResponse>(new VerificarFacturasCommand(factura, payload.empresaid));
                 return Ok(res);
             }
             return Unauthorized();

@@ -1,16 +1,17 @@
-﻿using AutoMapper;
-using MediatR;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using TreskelRest.API.Common;
 using TreskelRest.API.Helpers;
+using TreskelRest.API.Mappers;
+using TreskelRest.Biz.Models.Responses;
 using TreskelRest.Biz.Servicios;
+using Wolverine;
 
 namespace TreskelRest.API.Controllers
 {
     [Route("[controller]")]
     public class RetencionController : TreskelController
     {
-        public RetencionController(IConfiguration config, IMediator mediator, IMapper mapper) : base(config, mediator, mapper)
+        public RetencionController(IConfiguration config, IMessageBus mediator, APIMapperProfile mapper) : base(config, mediator, mapper)
         {
 
         }
@@ -25,11 +26,11 @@ namespace TreskelRest.API.Controllers
                 Sri.Retencion _retencion = XMLHelper.Deserialize<Sri.Retencion>(payload.data);
 
                 Biz.Models.Retencion retencion = new Biz.Models.Retencion();
-                Biz.Models.Documentos.Retencion _documento = _mapper.Map<Biz.Models.Documentos.Retencion>(_retencion);
+                Biz.Models.Documentos.Retencion _documento = _mapper.RetencionSriToRetencion(_retencion);
 
-                retencion = _mapper.Map<Biz.Models.Retencion>(payload);
+                retencion = _mapper.ToEntity(payload);
 
-                var res = await _mediator.Send(new ProcesarRetencionCommand(retencion, _documento, payload.empresaid, payload.bData));
+                var res = await _mediator.InvokeAsync<ComprobanteResponse>(new ProcesarRetencionCommand(retencion, _documento, payload.empresaid, payload.bData));
                 return Ok(res);
             }
             return Unauthorized();
@@ -42,9 +43,9 @@ namespace TreskelRest.API.Controllers
             if (valido != null)
             {
                 Biz.Models.Retencion retencion = new Biz.Models.Retencion();
-                retencion = _mapper.Map<Biz.Models.Retencion>(payload);
+                retencion = _mapper.ToEntity(payload);
 
-                var res = await _mediator.Send(new VerificarRetencionesCommand(retencion, payload.empresaid));
+                var res = await _mediator.InvokeAsync<ComprobanteResponse>(new VerificarRetencionesCommand(retencion, payload.empresaid));
                 return Ok(res);
             }
             return Unauthorized();

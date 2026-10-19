@@ -1,22 +1,20 @@
-﻿using AutoMapper;
-using MediatR;
-using TreskelRest.Biz.Interfaces;
+﻿using TreskelRest.Biz.Interfaces;
+using TreskelRest.Biz.Mappers;
 using TreskelRest.Biz.Models;
+using TreskelRest.Biz.Models.Common;
 using TreskelRest.Biz.Models.Requests;
 using TreskelRest.Biz.Models.Responses;
 using TreskelRest.Data;
 
 namespace TreskelRest.Biz.Servicios
 {
-    public record ProcesarNotaCreditoCommand(NotaCredito notacredito, Models.Documentos.NotaCredito documento, string empresaId, byte[] xmlfile) : IRequest<ComprobanteResponse>;
-    public class ProcesarNotaCreditoHandler : ProcessHandler, IRequestHandler<ProcesarNotaCreditoCommand, ComprobanteResponse>
+    public record ProcesarNotaCreditoCommand(NotaCredito notacredito, Models.Documentos.NotaCredito documento, string empresaId, byte[] xmlfile);
+    public class ProcesarNotaCreditoHandler : ServiciosHandler
     {
         private readonly ISriComprobanteService _pdfService;
         private readonly ITreskelFilesRepository _files;
-        private readonly ITreskelRepository _repo;
         private readonly ISriWebService _sriService;
         private readonly ISendEmail _sendMail;
-        private readonly IMapper _mapper;
 
         public ProcesarNotaCreditoHandler(
             ISriComprobanteService pdfService,
@@ -24,14 +22,12 @@ namespace TreskelRest.Biz.Servicios
             ITreskelRepository repo,
             ISriWebService sriWebService,
             ISendEmail sendMail,
-            IMapper mapper)
+            BizMapperProfile mapper): base(repo, mapper)
         {
             _pdfService = pdfService;
             _files = mongoRepo;
-            _repo = repo;
             _sriService = sriWebService;
             _sendMail = sendMail;
-            _mapper = mapper;
         }
 
         public async Task<ComprobanteResponse> Handle(ProcesarNotaCreditoCommand request, CancellationToken cancellationToken)
@@ -56,10 +52,11 @@ namespace TreskelRest.Biz.Servicios
 
             // 2.- Generamos el PDF de la factura
             byte[] pdfBytes = _pdfService.GenerarNotaCreditoPdf(request.notacredito, request.documento, empresa.Nombre, "", empresa.CreateOnHd);
+            byte[] xmlBytes = _pdfService.GenerarNotaCreditoXml(request.notacredito, request.documento, empresa.Nombre, "", "AUTORIZADO", empresa.CreateOnHd);
 
             // 3.- Se registran los archivos en MongoDB
             string fileId = "";
-            if (pdfBytes != null && request.xmlfile != null && empresa.UsaMongoDB)
+            if (pdfBytes != null && xmlBytes != null && empresa.UsaMongoDB)
             {
                 Data.Models.MongoRequest mongoRequest = new Data.Models.MongoRequest
                 {
@@ -71,7 +68,7 @@ namespace TreskelRest.Biz.Servicios
                         tipoArchivoPdf = "application/pdf",
                         archivoPdf = pdfBytes,
                         tipoArchivoXml = "application/xml",
-                        archivoXml = request.xmlfile
+                        archivoXml = xmlBytes
                     }
                 };
 
@@ -80,12 +77,13 @@ namespace TreskelRest.Biz.Servicios
 
             // 4.- Se registra la factura en la base de datos
 
-            Data.Models.NotaCredito _notacredito = _mapper.Map<Data.Models.NotaCredito>(request.notacredito);
+            Data.Models.NotaCredito _notacredito = _mapper.NotaCreditoToDto(request.notacredito);
+                
             if (pdfBytes != null)
                 _notacredito.pdfGenerado = true;
 
             var proceso_grabado = await _repo.grabarNotaCredito(_notacredito, fileId);
-            _mapper.Map(proceso_grabado, _notacredito);
+            _mapper.UpdateNotaCredito(proceso_grabado, _notacredito);
 
             // 5.- Se envía la factura al SRI para su validación
             RespuestaSRI sriRespuesta = await _sriService.validaDocumento(
@@ -103,7 +101,7 @@ namespace TreskelRest.Biz.Servicios
                 origen = empresa.email,
                 destino = _notacredito.emailCliente,
                 archivoPdf = pdfBytes,
-                archivoXml = request.xmlfile,
+                archivoXml = xmlBytes,
                 asunto = "Comprobante Electrónico de Nota de Crédito",
                 contenido = $"",
                 nombreArchivo = _notacredito.claveAcceso
@@ -121,7 +119,7 @@ namespace TreskelRest.Biz.Servicios
             }
 
             proceso_grabado = await _repo.actualizaNotaCredito(_notacredito);
-            _mapper.Map(proceso_grabado, _notacredito);
+            _mapper.UpdateNotaCredito(proceso_grabado, _notacredito);
 
             // 7.- Se retorna el resultado
             ComprobanteResponse comprobante = new ComprobanteResponse

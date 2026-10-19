@@ -1,6 +1,6 @@
-﻿using AutoMapper;
-using Moq;
+﻿using Moq;
 using TreskelRest.Biz.Interfaces;
+using TreskelRest.Biz.Mappers;
 using TreskelRest.Biz.Models.Correo;
 using TreskelRest.Biz.Servicios;
 using TreskelRest.Data;
@@ -12,7 +12,7 @@ namespace TreskelRest.Biz.Test
     {
         private Mock<ITreskelRepository> _repoMock;
         private Mock<ISendEmail> _sendMailMock;
-        private Mock<IMapper> _mapperMock;
+        private Mock<BizMapperProfile> _mapperMock;
         private ProcesarSendMailHandler _handler;
 
         [SetUp]
@@ -20,7 +20,7 @@ namespace TreskelRest.Biz.Test
         {
             _repoMock = new Mock<ITreskelRepository>();
             _sendMailMock = new Mock<ISendEmail>();
-            _mapperMock = new Mock<IMapper>();
+            _mapperMock = new Mock<BizMapperProfile>();
 
             _handler = new ProcesarSendMailHandler(
                 _repoMock.Object,
@@ -35,10 +35,10 @@ namespace TreskelRest.Biz.Test
             string empresaId = "5C107070-422C-4A45-9B4E-8D5565B66D01";
             var emailPayload = new EmailPayload
             {
-                origen = new CuentaEmail { email = "info@lacostatech.com", nombre = "LacostaTech"},
+                origen = new CuentaEmail { email = "info@lacostatech.com", name = "LacostaTech"},
                 destino = new List<CuentaEmail> { 
                     new CuentaEmail { 
-                        email = "ignacio.alban@gmail.com", nombre="Ignacio Albán"
+                        email = "ignacio.alban@gmail.com", name="Ignacio Albán"
                     } 
                 },
                 asunto = "Test De Correo Electrónico",

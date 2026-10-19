@@ -1,14 +1,19 @@
 ﻿using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using SharpCompress.Factories;
+using System.Text;
+using System.Xml.Serialization;
 using TreskelRest.Biz.Interfaces;
+using TreskelRest.Biz.Models;
 using TreskelRest.Biz.Models.Documentos;
 
 namespace TreskelRest.Biz.Servicios
 {
-    public class SriComprobanteService : ISriComprobanteService
+    public class SriComprobanteService : ISriComprobanteService, System.IDisposable
     {
         public bool createOnHd = true;
+        private bool disposedValue;
 
         public byte[] GenerarFacturaPdf(Models.Factura factura, Models.Documentos.Factura documento, string empresaNombre, string direccionMatriz, bool createOnHd=true)
         {
@@ -199,7 +204,11 @@ namespace TreskelRest.Biz.Servicios
                             // BLOQUE INFERIOR IZQUIERDO: Información Adicional (Sin recuadros pesados)
                             table.Cell().RowSpan(9).ColumnSpan(3).PaddingTop(12).PaddingRight(20).Column(col =>
                             {
-                                col.Item().Text("Información Adicional").Bold().FontSize(9.5f);
+                                var borderGrisClaro = 0.5f;
+                                var colorLinea = Colors.Grey.Lighten2;
+
+                                col.Item().BorderBottom(borderGrisClaro).BorderColor(colorLinea)
+                                    .Text("Información Adicional").Bold().FontSize(9.5f);
                                 if (factura.InformacionAdicional != null)
                                 {
                                     foreach (var info in factura.InformacionAdicional)
@@ -219,24 +228,27 @@ namespace TreskelRest.Biz.Servicios
                                         });
                                     }
                                 }
-                            });
 
-                            /*------------------------------------------------------
-                             * FORMA DE PAGO
-                             -------------------------------------------------------*/
-                            table.Cell().RowSpan(9).ColumnSpan(3).PaddingTop(12).PaddingRight(20).Column(col =>
-                            {
-                                col.Item().Text("Forma de Pago").Bold().FontSize(9.5f);
-                                foreach (var pago in factura.formaDePago)
+                                var formaPagos = infoFactura.Pagos.Pago;
+
+                                if(formaPagos != null)
                                 {
-                                    col.Item().PaddingTop(2).Text(txt => {
-                                        txt.Span($"{pago.tipo} : ").Bold().FontSize(8.5f);
-                                        txt.Span($"{pago.valor}").FontSize(8.5f);
-                                    });
+                                    col.Item().BorderBottom(borderGrisClaro).BorderColor(colorLinea)
+                                        .Text("Formas de Pago").Bold().FontSize(9.5f);
+
+                                    foreach (var pago in formaPagos)
+                                    {
+                                        col.Item().PaddingTop(2).Text(txt => {
+                                            txt.Span($"{getFormaPago(pago.FormaPago)} : ").Bold().FontSize(8.5f);
+                                            txt.Span($"{pago.Total}").FontSize(8.5f);
+                                        });
+                                    }
                                 }
                             });
 
-
+                            /*------------------------------------------------------
+                             * DETALLE DE PAGO
+                             -------------------------------------------------------*/
                             var porcentajeIva = infoFactura.TotalConImpuestos.TotalImpuesto[0].DecoPorcentajeImpuesto();
 
                             var subSinIVA = documento.Detalles.Detalle
@@ -331,21 +343,6 @@ namespace TreskelRest.Biz.Servicios
                                     .BorderBottom(borderGrisClaro).BorderColor(colorLinea)
                                     .PaddingTop(6).PaddingBottom(2).Text(string.Format("{0:0.00}", total)).AlignRight().Bold().FontSize(9f);
                             });
-
-                            var formaPagos = infoFactura.Pagos.Pago;
-
-                            table.Cell().RowSpan(9).ColumnSpan(3).PaddingTop(12).PaddingRight(20).Column(col =>
-                            {
-                                col.Item().Text("Formas de Pago").Bold().FontSize(9.5f);
-
-                                foreach (var pago in formaPagos)
-                                {
-                                    col.Item().PaddingTop(2).Text(txt => {
-                                        txt.Span($"{getFormaPago(pago.FormaPago)}").Bold().FontSize(8.5f);
-                                        txt.Span(pago.Total).FontSize(8.5f);
-                                    });
-                                }
-                            });
                         });
                     });
                 });
@@ -359,9 +356,37 @@ namespace TreskelRest.Biz.Servicios
             using (var stream = new System.IO.MemoryStream())
             {
                 pdfDocument.GeneratePdf(stream);
-                string path = generaPathArchivo(infoTributaria.NombreComercial, factura.ClaveAcceso, "Facturacion");
+                string path = generaPathArchivo(infoTributaria.NombreComercial, factura.ClaveAcceso, "Facturacion", "pdf");
                 File.WriteAllBytes(path, stream.ToArray());
                 return stream.ToArray();
+            }
+
+            throw new NotImplementedException();
+        }
+        public byte[] GenerarFacturaXml(Models.Factura factura, Models.Documentos.Factura documento, string empresaNombre, string direccionMatriz, string estado, bool createOnHd = true, byte[] xmlfile = null)
+        {
+            InfoTributaria infoTributaria = documento.InfoTributaria;
+            InfoFactura infoFactura = documento.InfoFactura;
+
+            RespuestaAutorizacion xmlAutorizacion = new RespuestaAutorizacion()
+            {
+                Ambiente = factura.Ambiente,
+                Comprobante = xmlfile != null ? Encoding.UTF8.GetString(xmlfile) : string.Empty,
+                Estado = estado,
+                NumeroAutorizacion = factura.Autorizacion
+            };
+
+            var serializer = new XmlSerializer(typeof(RespuestaAutorizacion));
+            var xns = new XmlSerializerNamespaces();
+            xns.Add(string.Empty, string.Empty); // evitar namespaces innecesarios en salida
+
+            using (var stream = new System.IO.MemoryStream())
+            {
+                serializer.Serialize(stream, xmlAutorizacion, xns);
+                var bytes = stream.ToArray();
+                string path = generaPathArchivo(infoTributaria.NombreComercial, factura.ClaveAcceso, "Facturacion", "xml");
+                File.WriteAllBytes(path, bytes);
+                return bytes;
             }
 
             throw new NotImplementedException();
@@ -599,9 +624,37 @@ namespace TreskelRest.Biz.Servicios
             using (var stream = new System.IO.MemoryStream())
             {
                 pdfDocument.GeneratePdf(stream);
-                string path = generaPathArchivo(infoTributaria.NombreComercial, retencion.ClaveAcceso, "Retencion");
+                string path = generaPathArchivo(infoTributaria.NombreComercial, retencion.ClaveAcceso, "Retencion", "pdf");
                 File.WriteAllBytes(path, stream.ToArray());
                 return stream.ToArray();
+            }
+
+            throw new NotImplementedException();
+        }
+        public byte[] GenerarRetencionXml(Models.Retencion retencion, Models.Documentos.Retencion documento, string empresaNombre, string direccionMatriz, string estado, bool createOnHd = true, byte[] xmlfile = null)
+        {
+            InfoTributaria infoTributaria = documento.InfoTributaria;
+            InfoCompRetencion infoRetencion = documento.InfoCompRetencion;
+
+            RespuestaAutorizacion xmlAutorizacion = new RespuestaAutorizacion()
+            {
+                Ambiente = retencion.Ambiente,
+                Comprobante = xmlfile != null ? Encoding.UTF8.GetString(xmlfile) : string.Empty,
+                Estado = estado,
+                NumeroAutorizacion = retencion.Autorizacion
+            };
+
+            var serializer = new XmlSerializer(typeof(RespuestaAutorizacion));
+            var xns = new XmlSerializerNamespaces();
+            xns.Add(string.Empty, string.Empty); // evitar namespaces innecesarios en salida
+
+            using (var stream = new System.IO.MemoryStream())
+            {
+                serializer.Serialize(stream, xmlAutorizacion, xns);
+                var bytes = stream.ToArray();
+                string path = generaPathArchivo(infoTributaria.NombreComercial, retencion.ClaveAcceso, "Retencion", "xml");
+                File.WriteAllBytes(path, bytes);
+                return bytes;
             }
 
             throw new NotImplementedException();
@@ -679,7 +732,7 @@ namespace TreskelRest.Biz.Servicios
 
                         row.RelativeItem(1.1f).Border(1).BorderColor(Colors.Grey.Darken1).Padding(8).Column(column =>
                         {
-                            column.Item().Text("COMPROBANTE DE RETENCIÓN").Bold().FontSize(14).AlignCenter();
+                            column.Item().Text("COMPROBANTE DE NOTA DE CRÉDITO").Bold().FontSize(14).AlignCenter();
                             column.Item().PaddingTop(2).Text(t => {
                                 t.Span("No: ").Bold().FontSize(10);
                                 t.Span(numeroFactura).Bold().FontColor(Colors.Red.Medium).FontSize(10);
@@ -796,7 +849,12 @@ namespace TreskelRest.Biz.Servicios
                             // BLOQUE INFERIOR IZQUIERDO: Información Adicional (Sin recuadros pesados)
                             table.Cell().RowSpan(9).ColumnSpan(3).PaddingTop(12).PaddingRight(20).Column(col =>
                             {
-                                col.Item().Text("Información Adicional").Bold().FontSize(9.5f);
+                                var borderGrisClaro = 0.5f;
+                                var colorLinea = Colors.Grey.Lighten2;
+
+                                col.Item().BorderBottom(borderGrisClaro).BorderColor(colorLinea)
+                                    .Text("Información Adicional").Bold().FontSize(9.5f);
+
                                 if (documento.InfoAdicional != null)
                                 {
                                     foreach (var info in documento.InfoAdicional.CampoAdicional)
@@ -906,14 +964,41 @@ namespace TreskelRest.Biz.Servicios
             using (var stream = new System.IO.MemoryStream())
             {
                 pdfDocument.GeneratePdf(stream);
-                string path = generaPathArchivo(infoTributaria.NombreComercial, notacredito.ClaveAcceso, "NotaCredito");
+                string path = generaPathArchivo(infoTributaria.NombreComercial, notacredito.ClaveAcceso, "NotaCredito", "pdf");
                 File.WriteAllBytes(path, stream.ToArray());
                 return stream.ToArray();
             }
 
             throw new NotImplementedException();
         }
+        public byte[] GenerarNotaCreditoXml(Models.NotaCredito notacredito, Models.Documentos.NotaCredito documento, string empresaNombre, string direccionMatriz, string estado, bool createOnHd = true, byte[] xmlfile = null)
+        {
+            InfoTributaria infoTributaria = documento.InfoTributaria;
+            InfoNotaCredito infoNotaCredito = documento.InfoNotaCredito;
 
+            RespuestaAutorizacion xmlAutorizacion = new RespuestaAutorizacion()
+            {
+                Ambiente = notacredito.Ambiente,
+                Comprobante = xmlfile != null ? Encoding.UTF8.GetString(xmlfile) : string.Empty,
+                Estado = estado,
+                NumeroAutorizacion = notacredito.Autorizacion
+            };
+
+            var serializer = new XmlSerializer(typeof(RespuestaAutorizacion));
+            var xns = new XmlSerializerNamespaces();
+            xns.Add(string.Empty, string.Empty);
+
+            using (var stream = new System.IO.MemoryStream())
+            {
+                serializer.Serialize(stream, xmlAutorizacion, xns);
+                var bytes = stream.ToArray();
+                string path = generaPathArchivo(infoTributaria.NombreComercial, notacredito.ClaveAcceso, "NotaCredito", "xml");
+                File.WriteAllBytes(path, bytes);
+                return bytes;
+            }
+
+            throw new NotImplementedException();
+        }
         private string removeTildesEspacios(string texto)
         {
             texto = texto.Replace("á", "a");
@@ -936,7 +1021,7 @@ namespace TreskelRest.Biz.Servicios
             return texto;
         }
 
-        private string generaPathArchivo(string empresa, string claveAcceso, string tipo)
+        private string generaPathArchivo(string empresa, string claveAcceso, string tipo, string extension)
         {
             string baseDirectory = Path.Combine(AppContext.BaseDirectory, "PDFs");
             var fecha = DateTime.Now;
@@ -956,7 +1041,7 @@ namespace TreskelRest.Biz.Servicios
                 Directory.CreateDirectory(carpetaDestino);
             }
 
-            string nombreArchivo = $"{claveAcceso}.pdf";
+            string nombreArchivo = $"{claveAcceso}.{extension}";
             string path = Path.Combine(carpetaDestino, nombreArchivo);
             return path;
         }
@@ -975,6 +1060,26 @@ namespace TreskelRest.Biz.Servicios
                 "21" => "Endoso de Títulos",
                 _ => string.Empty
             };
+        }
+
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    // TODO: eliminar el estado administrado (objetos administrados)
+                }
+
+                disposedValue = true;
+            }
+        }
+
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
         }
     }
 }

@@ -1,18 +1,16 @@
-﻿using AutoMapper;
-using MediatR;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using TreskelRest.API.Common;
-using TreskelRest.API.Helpers;
+using TreskelRest.API.Mappers;
 using TreskelRest.API.Models.Mensajes;
-using TreskelRest.API.Models.Usuarios;
 using TreskelRest.Biz.Servicios;
+using Wolverine;
 
 namespace TreskelRest.API.Controllers
 {
     [Route("[controller]")]
     public class MensajesController : TreskelController
     {
-        public MensajesController(IConfiguration config, IMediator mediator, IMapper mapper) : base(config, mediator, mapper)
+        public MensajesController(IConfiguration config, IMessageBus mediator, APIMapperProfile mapper) : base(config, mediator, mapper)
         {
 
         }
@@ -24,10 +22,11 @@ namespace TreskelRest.API.Controllers
 
             if (valido != null)
             {
-                Biz.Models.Correo.EmailPayload email = _mapper.Map<Biz.Models.Correo.EmailPayload>(payload);
+                Biz.Models.Correo.EmailPayload email = _mapper.ToBizEmailPayload(payload);
+                    
                 string empresaId = payload.empresaId;
 
-                var res = await _mediator.Send(new ProcesarSendMailCommand(email, empresaId));
+                var res = await _mediator.InvokeAsync<bool>(new ProcesarSendMailCommand(email, empresaId));
                 return Ok(res);
 
             }
@@ -42,7 +41,8 @@ namespace TreskelRest.API.Controllers
 
             if (valido != null)
             {
-                Biz.Models.Correo.MensajeWs mensaje = _mapper.Map<Biz.Models.Correo.MensajeWs>(payload);
+                Biz.Models.Correo.MensajeWs mensaje = _mapper.MessageWsToBizMessageWs(payload);
+                    
                 string empresaId = payload.empresaId;
                 //var res = await _mediator.Send(new ProcesarSendMailCommand(mensaje, empresaId));
                 //return Ok(res);

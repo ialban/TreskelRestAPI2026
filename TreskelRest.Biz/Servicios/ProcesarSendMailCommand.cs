@@ -1,22 +1,20 @@
-﻿using AutoMapper;
-using MediatR;
-using TreskelRest.Biz.Interfaces;
+﻿using TreskelRest.Biz.Interfaces;
+using TreskelRest.Biz.Mappers;
+using TreskelRest.Biz.Models.Common;
 using TreskelRest.Biz.Models.Correo;
 using TreskelRest.Data;
 
 namespace TreskelRest.Biz.Servicios
 {
-    public record ProcesarSendMailCommand(EmailPayload email, string empresaId) : IRequest<bool>;
-    public class ProcesarSendMailHandler : ProcessHandler, IRequestHandler<ProcesarSendMailCommand, bool>
+    public record ProcesarSendMailCommand(EmailPayload email, string empresaId);
+    public class ProcesarSendMailHandler : ServiciosHandler
     {
-        private readonly ITreskelRepository _repo;
         private readonly ISendEmail _sendMail;
-        private readonly IMapper _mapper;
 
         public ProcesarSendMailHandler(
             ITreskelRepository repo,
             ISendEmail sendMail,
-            IMapper mapper)
+            BizMapperProfile mapper): base(repo, mapper)
         {
             _repo = repo;
             _sendMail = sendMail;

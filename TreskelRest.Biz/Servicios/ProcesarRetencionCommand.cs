@@ -1,24 +1,21 @@
-﻿using AutoMapper;
-using MediatR;
-using TreskelRest.Biz.Interfaces;
+﻿using TreskelRest.Biz.Interfaces;
+using TreskelRest.Biz.Mappers;
 using TreskelRest.Biz.Models;
+using TreskelRest.Biz.Models.Common;
 using TreskelRest.Biz.Models.Requests;
 using TreskelRest.Biz.Models.Responses;
 using TreskelRest.Data;
-using TreskelRest.Data.Base;
 
 namespace TreskelRest.Biz.Servicios
 {
-    public record ProcesarRetencionCommand(Retencion retencion, Models.Documentos.Retencion documento, string empresaId, byte[] xmlfile) : IRequest<ComprobanteResponse>;
+    public record ProcesarRetencionCommand(Retencion retencion, Models.Documentos.Retencion documento, string empresaId, byte[] xmlfile);
 
-    public class ProcesarRetencionHandler : ProcessHandler, IRequestHandler<ProcesarRetencionCommand, ComprobanteResponse>
+    public class ProcesarRetencionHandler : ServiciosHandler
     {
         private readonly ISriComprobanteService _pdfService;
         private readonly ITreskelFilesRepository _files;
-        private readonly ITreskelRepository _repo;
         private readonly ISriWebService _sriService;
         private readonly ISendEmail _sendMail;
-        private readonly IMapper _mapper;
 
         public ProcesarRetencionHandler(
             ISriComprobanteService pdfService,
@@ -26,14 +23,12 @@ namespace TreskelRest.Biz.Servicios
             ITreskelRepository repo,
             ISriWebService sriWebService,
             ISendEmail sendMail,
-            IMapper mapper)
+            BizMapperProfile mapper): base(repo, mapper)
         {
             _pdfService = pdfService;
             _files = mongoRepo;
-            _repo = repo;
             _sriService = sriWebService;
             _sendMail = sendMail;
-            _mapper = mapper;
         }
 
         public async Task<ComprobanteResponse> Handle(ProcesarRetencionCommand request, CancellationToken cancellationToken)
@@ -58,10 +53,11 @@ namespace TreskelRest.Biz.Servicios
 
             // 2.- Generamos el PDF de la factura
             byte[] pdfBytes = _pdfService.GenerarRetencionPdf(request.retencion, request.documento, empresa.Nombre, "", empresa.CreateOnHd);
+            byte[] xmlBytes = _pdfService.GenerarRetencionXml(request.retencion, request.documento, empresa.Nombre, "", "AUTORIZADO", empresa.CreateOnHd);
 
             // 3.- Se registran los archivos en MongoDB
             string fileId = "";
-            if (pdfBytes != null && request.xmlfile != null && empresa.UsaMongoDB)
+            if (pdfBytes != null && xmlBytes != null && empresa.UsaMongoDB)
             {
                 Data.Models.MongoRequest mongoRequest = new Data.Models.MongoRequest
                 {
@@ -73,7 +69,7 @@ namespace TreskelRest.Biz.Servicios
                         tipoArchivoPdf = "application/pdf",
                         archivoPdf = pdfBytes,
                         tipoArchivoXml = "application/xml",
-                        archivoXml = request.xmlfile
+                        archivoXml = xmlBytes
                     }
                 };
 
@@ -82,7 +78,8 @@ namespace TreskelRest.Biz.Servicios
 
             // 4.- Se registra la factura en la base de datos
 
-            Data.Models.Retencion _retencion = _mapper.Map<Data.Models.Retencion>(request.retencion);
+            Data.Models.Retencion _retencion = _mapper.RetencionToDto(request.retencion);
+
             if (pdfBytes != null)
                 _retencion.pdfGenerado = true;
 
@@ -94,7 +91,7 @@ namespace TreskelRest.Biz.Servicios
             _retencion.emailCliente = request.documento.InfoAdicional.CampoAdicional.Where(x => x.Nombre == "Email").Select(y => y.Text).FirstOrDefault();
 
             var proceso_grabado = await _repo.grabarRetencion(_retencion, fileId);
-            _mapper.Map(proceso_grabado, _retencion);
+            _mapper.UpdateRetencion(proceso_grabado, _retencion);
 
             // 5.- Se envía la factura al SRI para su validación
             RespuestaSRI sriRespuesta = await _sriService.validaDocumento(
@@ -114,7 +111,7 @@ namespace TreskelRest.Biz.Servicios
                     origen = empresa.email,
                     destino = _retencion.emailCliente,
                     archivoPdf = pdfBytes,
-                    archivoXml = request.xmlfile,
+                    archivoXml = xmlBytes,
                     asunto = "Comprobante Electrónico de Retención",
                     contenido = $"",
                     nombreArchivo = _retencion.claveAcceso
@@ -133,7 +130,7 @@ namespace TreskelRest.Biz.Servicios
             }
 
             proceso_grabado = await _repo.actualizaRetencion(_retencion);
-            _mapper.Map(proceso_grabado, _retencion);
+            _mapper.UpdateRetencion(proceso_grabado, _retencion);
 
             // 7.- Se retorna el resultado
             ComprobanteResponse comprobante = new ComprobanteResponse

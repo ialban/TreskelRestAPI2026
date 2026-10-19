@@ -1,7 +1,7 @@
-﻿using AutoMapper;
-using MediatR;
-using TreskelRest.Biz.Interfaces;
+﻿using TreskelRest.Biz.Interfaces;
+using TreskelRest.Biz.Mappers;
 using TreskelRest.Biz.Models;
+using TreskelRest.Biz.Models.Common;
 using TreskelRest.Biz.Models.Requests;
 using TreskelRest.Biz.Models.Responses;
 using TreskelRest.Data;
@@ -9,31 +9,27 @@ using TreskelRest.Data.Models;
 
 namespace TreskelRest.Biz.Servicios
 {
-    public record ProcesarComprobanteCommand(Factura factura, Models.Documentos.Factura documento, string empresaId, byte[] xmlfile) : IRequest<ComprobanteResponse>;
+    public record ProcesarComprobanteCommand(Factura factura, Models.Documentos.Factura documento, string empresaId, byte[] xmlfile);
 
-    public class ProcesarComprobanteHandler : ProcessHandler, IRequestHandler<ProcesarComprobanteCommand, ComprobanteResponse>
+    public class ProcesarComprobanteHandler : ServiciosHandler 
     {
         private readonly ISriComprobanteService _pdfService;
         private readonly ITreskelFilesRepository _files;
-        private readonly ITreskelRepository _repo;
         private readonly ISriWebService _sriService;
         private readonly ISendEmail _sendMail;
-        private readonly IMapper _mapper;
 
         public ProcesarComprobanteHandler(
-            ISriComprobanteService pdfService,
+            ISriComprobanteService fileService,
             ITreskelFilesRepository mongoRepo,
             ITreskelRepository repo,
             ISriWebService sriWebService,
             ISendEmail sendMail,
-            IMapper mapper)
+            BizMapperProfile mapper): base(repo, mapper)
         {
-            _pdfService = pdfService;
+            _pdfService = fileService;
             _files = mongoRepo;
-            _repo = repo;
             _sriService = sriWebService;
             _sendMail = sendMail;
-            _mapper = mapper;
         }
 
         public async Task<ComprobanteResponse> Handle(ProcesarComprobanteCommand request, CancellationToken cancellationToken)
@@ -56,12 +52,13 @@ namespace TreskelRest.Biz.Servicios
             if (empresa.Logotipo != null)
                 request.factura.logotipo = empresa.Logotipo;
 
-            // 2.- Generamos el PDF de la factura
+            // 2.- Generamos el PDF y XML de la factura
             byte[] pdfBytes = _pdfService.GenerarFacturaPdf(request.factura, request.documento, empresa.Nombre, "", empresa.CreateOnHd);
+            byte[] xmlBytes = _pdfService.GenerarFacturaXml(request.factura, request.documento, empresa.Nombre, "", "AUTORIZADO", empresa.CreateOnHd, request.xmlfile);
 
             // 3.- Se registran los archivos en MongoDB
             string fileId = "";
-            if (pdfBytes != null && request.xmlfile != null && empresa.UsaMongoDB)
+            if (pdfBytes != null && xmlBytes != null && empresa.UsaMongoDB)
             {
                 MongoRequest mongoRequest = new MongoRequest
                 {
@@ -73,7 +70,7 @@ namespace TreskelRest.Biz.Servicios
                         tipoArchivoPdf = "application/pdf",
                         archivoPdf = pdfBytes,
                         tipoArchivoXml = "application/xml",
-                        archivoXml = request.xmlfile
+                        archivoXml = xmlBytes
                     }
                 };
 
@@ -82,12 +79,12 @@ namespace TreskelRest.Biz.Servicios
 
             // 4.- Se registra la factura en la base de datos
 
-            Facturacion _factura = _mapper.Map<Facturacion>(request.factura);
+            Facturacion _factura = _mapper.FacturaToDto(request.factura);
             if (pdfBytes != null)
                 _factura.pdfGenerado = true;
 
             var proceso_grabado = await _repo.grabarFactura(_factura, fileId);
-            _mapper.Map(proceso_grabado, _factura);
+            _mapper.UpdateFacturacion(proceso_grabado, _factura);
 
             // 5.- Se envía la factura al SRI para su validación
             RespuestaSRI sriRespuesta = await _sriService.validaDocumento(
@@ -105,7 +102,7 @@ namespace TreskelRest.Biz.Servicios
                 origen = empresa.email,
                 destino = _factura.emailCliente,
                 archivoPdf = pdfBytes,
-                archivoXml = request.xmlfile,
+                archivoXml = xmlBytes,
                 asunto = "Comprobante Electrónico de Facturación",
                 contenido = $"",
                 nombreArchivo = _factura.claveAcceso
@@ -123,7 +120,7 @@ namespace TreskelRest.Biz.Servicios
             }
 
             proceso_grabado = await _repo.actualizaFactura(_factura);
-            _mapper.Map(proceso_grabado, _factura);
+            _mapper.UpdateFacturacion(proceso_grabado, _factura);
 
             // 7.- Se retorna el resultado
             ComprobanteResponse comprobante = new ComprobanteResponse

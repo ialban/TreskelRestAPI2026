@@ -1,29 +1,22 @@
-﻿using AutoMapper;
-using MediatR;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using TreskelRest.Biz.Interfaces;
+﻿using TreskelRest.Biz.Interfaces;
+using TreskelRest.Biz.Mappers;
+using TreskelRest.Biz.Models.Common;
 using TreskelRest.Biz.Models.Correo;
 using TreskelRest.Data;
 
 namespace TreskelRest.Biz.Servicios
 {
-    public record ProcesarWhatsappCommand(MensajeWs mensaje, string empresaId) : IRequest<bool>;
-    public class ProcesarWhatsappHandler : ProcessHandler, IRequestHandler<ProcesarWhatsappCommand, bool>
+    public record ProcesarWhatsappCommand(MensajeWs mensaje, string empresaId);
+    public class ProcesarWhatsappHandler : ServiciosHandler
     {
-        private readonly ITreskelRepository _repo;
         private readonly IWhatsapp _mensaje;
-        private readonly IMapper _mapper;
-
+        
         public ProcesarWhatsappHandler(
             ITreskelRepository repo,
             IWhatsapp mensaje,
-            IMapper mapper)
+            BizMapperProfile mapper): base(repo, mapper)
         {
-            _repo = repo;
             _mensaje = mensaje;
-            _mapper = mapper;
         }
 
         public async Task<bool> Handle(ProcesarWhatsappCommand request, CancellationToken cancellationToken)
@@ -44,9 +37,7 @@ namespace TreskelRest.Biz.Servicios
                 throw new Exception($"Su cuenta no está habilitada para enviar mensajes a Whatsapp");
             }
 
-            MensajeWs contenido = _mapper.Map<MensajeWs>(request.mensaje);
-
-            var result = _mensaje.EnviarMensajeAsync(contenido, empresa.tokenWhatsapp);
+            var result = _mensaje.EnviarMensajeAsync(request.mensaje, empresa.tokenWhatsapp);
 
             throw new NotImplementedException();
         }

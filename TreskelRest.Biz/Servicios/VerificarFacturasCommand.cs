@@ -1,28 +1,24 @@
-﻿using AutoMapper;
-using MediatR;
-using TreskelRest.Biz.Interfaces;
+﻿using TreskelRest.Biz.Interfaces;
+using TreskelRest.Biz.Mappers;
 using TreskelRest.Biz.Models;
+using TreskelRest.Biz.Models.Common;
 using TreskelRest.Biz.Models.Responses;
 using TreskelRest.Data;
 using TreskelRest.Data.Models;
 
 namespace TreskelRest.Biz.Servicios
 {
-    public record VerificarFacturasCommand(Factura factura, string empresaId) : IRequest<ComprobanteResponse>;
-    public class VerificarFacturasHandler : IRequestHandler<VerificarFacturasCommand, ComprobanteResponse>
+    public record VerificarFacturasCommand(Factura factura, string empresaId);
+    public class VerificarFacturasHandler : ServiciosHandler
     {
-        private readonly ITreskelRepository _repo;
         private readonly ISriWebService _sriService;
-        private readonly IMapper _mapper;
 
         public VerificarFacturasHandler(
             ITreskelRepository repo,
             ISriWebService sriWebService,
-            IMapper mapper)
+            BizMapperProfile mapper): base(repo, mapper)
         {
-            _repo = repo;
             _sriService = sriWebService;
-            _mapper = mapper;
         }
 
         public async Task<ComprobanteResponse> Handle(VerificarFacturasCommand request, CancellationToken cancellationToken)
@@ -33,7 +29,8 @@ namespace TreskelRest.Biz.Servicios
             }
 
             // 1.- Obtenemos los datos de la fatura para la empresa
-            Facturacion _factura = _mapper.Map<Facturacion>(request.factura);
+            Facturacion _factura = _mapper.FacturaToDto(request.factura);
+                
             _factura.empresaid = request.empresaId;
 
             var factura = await _repo.obtenerFactura(_factura, "F");

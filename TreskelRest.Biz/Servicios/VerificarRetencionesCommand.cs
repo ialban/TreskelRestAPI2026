@@ -1,27 +1,23 @@
-﻿using AutoMapper;
-using MediatR;
-using TreskelRest.Biz.Interfaces;
+﻿using TreskelRest.Biz.Interfaces;
+using TreskelRest.Biz.Mappers;
+using TreskelRest.Biz.Models.Common;
 using TreskelRest.Biz.Models.Responses;
 using TreskelRest.Data;
 using TreskelRest.Data.Models;
 
 namespace TreskelRest.Biz.Servicios
 {
-    public record VerificarRetencionesCommand(Biz.Models.Retencion retencion, string empresaId) : IRequest<ComprobanteResponse>;
-    public class VerificarRetencionesHandler : IRequestHandler<VerificarRetencionesCommand, ComprobanteResponse>
+    public record VerificarRetencionesCommand(Models.Retencion retencion, string empresaId);
+    public class VerificarRetencionesHandler : ServiciosHandler
     {
-        private readonly ITreskelRepository _repo;
         private readonly ISriWebService _sriService;
-        private readonly IMapper _mapper;
 
         public VerificarRetencionesHandler(
             ITreskelRepository repo,
             ISriWebService sriWebService,
-            IMapper mapper)
+            BizMapperProfile mapper): base(repo, mapper)
         {
-            _repo = repo;
             _sriService = sriWebService;
-            _mapper = mapper;
         }
 
         public async Task<ComprobanteResponse> Handle(VerificarRetencionesCommand request, CancellationToken cancellationToken)
@@ -32,7 +28,8 @@ namespace TreskelRest.Biz.Servicios
             }
 
             // 1.- Obtenemos los datos de la fatura para la empresa
-            Retencion _retencion = _mapper.Map<Retencion>(request.retencion);
+            Retencion _retencion = _mapper.RetencionToDto(request.retencion);
+
             _retencion.empresaid = request.empresaId;
 
             var retencion = await _repo.obtenerRetencion(_retencion, "R");

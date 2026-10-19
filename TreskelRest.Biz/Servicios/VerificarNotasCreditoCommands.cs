@@ -1,24 +1,22 @@
-﻿using AutoMapper;
-using MediatR;
-using TreskelRest.Biz.Interfaces;
+﻿using TreskelRest.Biz.Interfaces;
+using TreskelRest.Biz.Mappers;
+using TreskelRest.Biz.Models.Common;
 using TreskelRest.Biz.Models.Responses;
 using TreskelRest.Data;
 using TreskelRest.Data.Models;
 
 namespace TreskelRest.Biz.Servicios
 {
-    public record VerificarNotasCreditoCommand(Biz.Models.NotaCredito notacredito, string empresaId) : IRequest<ComprobanteResponse>;
+    public record VerificarNotasCreditoCommand(Biz.Models.NotaCredito notacredito, string empresaId) ;
 
-    public class VerificarNotasCreditoHandler : IRequestHandler<VerificarNotasCreditoCommand, ComprobanteResponse>
+    public class VerificarNotasCreditoHandler : ServiciosHandler
     {
-        private readonly ITreskelRepository _repo;
         private readonly ISriWebService _sriService;
-        private readonly IMapper _mapper;
 
         public VerificarNotasCreditoHandler(
             ITreskelRepository repo,
             ISriWebService sriWebService,
-            IMapper mapper)
+            BizMapperProfile mapper): base(repo, mapper)
         {
             _repo = repo;
             _sriService = sriWebService;
@@ -33,7 +31,8 @@ namespace TreskelRest.Biz.Servicios
             }
 
             // 1.- Obtenemos los datos de la fatura para la empresa
-            NotaCredito _notacredito = _mapper.Map<NotaCredito>(request.notacredito);
+            NotaCredito _notacredito = _mapper.NotaCreditoToDto(request.notacredito);
+                
             _notacredito.empresaid = request.empresaId;
 
             var notacredito = await _repo.obtenerNotaCredito(_notacredito, "C");

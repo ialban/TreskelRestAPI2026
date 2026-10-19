@@ -3,11 +3,11 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Text.Json.Serialization;
 using TreskelRest.API.Exceptions;
-using TreskelRest.Biz;
 using TreskelRest.Biz.Interfaces;
 using TreskelRest.Biz.Procesos;
 using TreskelRest.Biz.Servicios;
 using TreskelRest.Data;
+using Wolverine;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -87,25 +87,41 @@ builder.Services.AddScoped<ITreskelRepository, TreskelRepository>();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-// Para usar MediatorR
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblies(typeof(BizAssemblyMarker).Assembly));
-
 // ===================================================
-// AutoMapper
+// Wolverine FX
 // ===================================================
-builder.Services.AddAutoMapper(cfg =>
-{
-    // Esto buscará automáticamente todas las clases que hereden de 'Profile'
-    // en el ensamblado donde se encuentra la clase Program (tu API)
-    cfg.AddMaps(typeof(Program).Assembly);
+builder.Host.UseWolverine(opts => {
+    opts.Discovery.IncludeAssembly(typeof(TreskelRest.Biz.Servicios.GetLoginQuery).Assembly);
+    opts.RestoreV5Defaults();
 
-    // Si tus perfiles están en la capa BIZ, añade también ese ensamblado:
-    cfg.AddMaps(typeof(TreskelRest.Biz.Models.Requests.MappingProfile).Assembly);
+    #if DEBUG
+        // 1. En desarrollo local usamos compilación dinámica y forzamos el uso de Roslyn
+        opts.CodeGeneration.TypeLoadMode = JasperFx.CodeGeneration.TypeLoadMode.Dynamic;
+        opts.UseRuntimeCompilation();
+    #else
+            // 2. En producción usamos modo estático (No compila nada en caliente, busca archivos pre-generados)
+            opts.CodeGeneration.TypeLoadMode = JasperFx.CodeGeneration.TypeLoadMode.Auto;
+    #endif
 });
+
+#if !DEBUG
+    builder.Services.AddWolverineRuntimeCompilation();
+#endif
+
+// ===================================================
+// Registro de Mappers tanto del API como Biz
+// ===================================================
+builder.Services.AddScoped<TreskelRest.API.Mappers.APIMapperProfile>();
+builder.Services.AddScoped<TreskelRest.Biz.Mappers.BizMapperProfile>();
+
 
 builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
+
+// Habilitar CORS en el pipeline si tu app de Angular lo requiere
+app.UseCors("AllowAll");
+
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -115,20 +131,14 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 else {
+    app.UseHttpsRedirection();
     app.UseExceptionHandler("/error-global-ficticio");
 }
-
-// Habilitar CORS en el pipeline si tu app de Angular lo requiere
-app.UseCors("AllowAll");
-
 
 // ===================================================
 // NUEVO: UBICACIÓN DE LA AUTENTICACIÓN
 // ===================================================
 app.UseAuthentication();
-
-app.UseHttpsRedirection();
-
 app.UseAuthorization();
 
 app.MapControllers();
